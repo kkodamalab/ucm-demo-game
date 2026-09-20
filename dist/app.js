@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s), clamp=(v,a=0,b=100)=>Math.max(a,Math.min(b
 let state={A:50,B:50,rA:50,rB:50,room:'',connected:{A:false,B:false},running:false,start:0,hold:0,bestHold:0,score:0,combo:0,bestCombo:0,data:[],last:0,delay:[],settings:{task:'sum',target:100,a:1,b:1,tol:5,duration:20,hold:3,mode:'coop',moving:'static',amp:20,period:10,noise:'off',gainA:1,gainB:1,perturb:false,onset:10,newGain:.7,feedback:'total',timing:'concurrent',interval:250,delay:300}};
 class RoomBus{constructor(room,role='host'){this.room=room;this.role=role;this.socket=io();this.socket.on('connect',()=>this.socket.emit('join-room',{room,role}));this.socket.on('presence',p=>{state.connected=p});this.socket.on('player-input',m=>{state[m.role]=m.value;state['r'+m.role]=m.raw;state.connected[m.role]=true});this.socket.on('host-feedback',m=>this.onFeedback?.(m))}send(m){if(m.type==='input')this.socket.emit('player-input',m);if(m.type==='feedback')this.socket.emit('host-feedback',m.payload)}close(){this.socket.disconnect()}}
 let bus,history=[];
-function task(){let s=state.settings,{A,B}=state;if(s.task==='difference')return A-B;if(s.task==='weighted')return s.a*A+s.b*B;return A+B}
+function task(){let s=state.settings,A=state.A*effGain('A'),B=state.B*effGain('B');if(s.task==='difference')return A-B;if(s.task==='weighted')return s.a*A+s.b*B;return A+B}
 function target(){let s=state.settings,t=(performance.now()-state.start)/1000;if(!state.running)return s.target;if(s.moving==='sine')return s.target+s.amp*Math.sin(2*Math.PI*t/s.period);if(s.moving==='step')return s.target+(Math.floor(t/s.period)%2? s.amp:-s.amp);if(s.moving==='random')return s.target+Math.round(Math.sin(Math.floor(t/s.period)*912.3)*s.amp);return s.target}
 function effGain(role){let s=state.settings,g=role==='A'?s.gainA:s.gainB;return s.perturb&&state.running&&role==='A'&&(performance.now()-state.start)/1000>=s.onset?s.newGain:g}
 function noise(){return state.settings.noise==='high'?(Math.random()-.5)*10:state.settings.noise==='medium'?(Math.random()-.5)*5:state.settings.noise==='low'?(Math.random()-.5)*2:0}
@@ -28,7 +28,7 @@ function tick(now){
     if(ok){state.hold+=.016;state.score+=1;state.combo++;state.bestCombo=Math.max(state.bestCombo,state.combo)}
     else{state.bestHold=Math.max(state.bestHold,state.hold);state.hold=0;state.combo=0}
     if(now-state.last>80){
-      state.last=now; state.data.push({t:elapsed,A:state.A,B:state.B,T,tar,err,ok,gA:effGain('A'),gB:effGain('B')});
+      state.last=now; state.data.push({timestamp:Date.now(),t:elapsed,raw_A:state.rA,raw_B:state.rB,normalized_A:state.A,normalized_B:state.B,effective_A:state.A*effGain('A'),effective_B:state.B*effGain('B'),A:state.A,B:state.B,T,tar,err,success:ok,gain_A:effGain('A'),gain_B:effGain('B'),input_type_A:'device',input_type_B:'device'});
       history.push({A:state.A,B:state.B,T,tar}); if(history.length>150)history.shift();
       bus?.send({type:'feedback',payload:{T,tar,err,ok,mode:s.mode,feedback:s.feedback}});
     }
