@@ -86,19 +86,26 @@ function playerSafe(role,room){
   window.addEventListener('beforeunload',()=>bus.close(),{once:true});
 }
 // Phase 1 host-only input configuration UI. Player-side application follows in Phase 1-③.
-const defaultPlayerInput = () => ({ inputMethod: "slider", direction: "vertical", sensitivity: "medium", customRange: 30, deadZone: "2", customDeadZone: 2, smoothing: "low", reverse: false });
+const defaultPlayerInput = () => ({ inputMethod: "slider", direction: "vertical", sensitivity: "medium", customRange: 30, deadZone: "2", customDeadZone: 2, smoothing: "low", reverse: false, camera: "rear", opticalFeature: "brightness" });
 if (!state.playerInput) state.playerInput = { A: defaultPlayerInput(), B: defaultPlayerInput() };
 const baseRenderHost = renderHost;
 function inputConfigMarkup(playerId) {
-  const c = state.playerInput[playerId], tilt = c.inputMethod === "tilt";
-  return `<fieldset class="player-input-config" data-player-config="${playerId}"><legend>Player ${playerId} input</legend><label>Input Method<select data-config="inputMethod"><option value="slider" ${c.inputMethod === "slider" ? "selected" : ""}>Slider</option><option value="tilt" ${tilt ? "selected" : ""}>Tilt</option></select></label>${tilt ? `<label>Tilt Direction<select data-config="direction"><option value="left-right" ${c.direction === "left-right" ? "selected" : ""}>Left–Right</option><option value="forward-backward" ${c.direction === "forward-backward" ? "selected" : ""}>Forward–Backward</option></select></label><label>Sensitivity<select data-config="sensitivity"><option value="high">High ±15°</option><option value="medium" ${c.sensitivity === "medium" ? "selected" : ""}>Medium ±30°</option><option value="low">Low ±45°</option><option value="custom">Custom</option></select></label>${c.sensitivity === "custom" ? `<label>Max tilt ±<input data-config="customRange" type="number" min="1" value="${c.customRange}">°</label>` : ""}<label>Dead Zone<select data-config="deadZone"><option value="off">OFF</option><option value="1">±1°</option><option value="2" ${c.deadZone === "2" ? "selected" : ""}>±2°</option><option value="3">±3°</option><option value="custom">Custom</option></select></label>${c.deadZone === "custom" ? `<label>Custom dead zone ±<input data-config="customDeadZone" type="number" min="0" value="${c.customDeadZone}">°</label>` : ""}<label>Smoothing<select data-config="smoothing"><option value="off">OFF</option><option value="low" ${c.smoothing === "low" ? "selected" : ""}>Low</option><option value="medium">Medium</option><option value="high">High</option></select></label><label>Reverse<select data-config="reverse"><option value="false" ${!c.reverse ? "selected" : ""}>OFF</option><option value="true" ${c.reverse ? "selected" : ""}>ON</option></select></label>` : `<label>Slider Direction<select data-config="direction"><option value="vertical" ${c.direction === "vertical" ? "selected" : ""}>Vertical</option><option value="horizontal">Horizontal</option></select></label>`}</fieldset>`;
+  const c = state.playerInput[playerId], tilt = c.inputMethod === "tilt", camera = c.inputMethod === "camera-pressure";
+  return `<fieldset class="player-input-config" data-player-config="${playerId}"><legend>Player ${playerId} input</legend><label>Input Method<select data-config="inputMethod"><option value="slider" ${c.inputMethod === "slider" ? "selected" : ""}>Slider</option><option value="tilt" ${tilt ? "selected" : ""}>Tilt</option><option value="camera-pressure" ${camera ? "selected" : ""}>Camera Pressure</option></select></label>${camera ? `<label>Camera<select data-config="camera"><option value="rear">Rear</option><option value="front">Front</option></select></label><label>Optical Feature<select data-config="opticalFeature"><option value="brightness">Brightness</option><option value="red">Red</option><option value="green">Green</option><option value="blue">Blue</option></select></label><label>Smoothing<select data-config="smoothing"><option value="off">OFF</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>` : tilt ? `<label>Tilt Direction<select data-config="direction"><option value="left-right" ${c.direction === "left-right" ? "selected" : ""}>Left–Right</option><option value="forward-backward" ${c.direction === "forward-backward" ? "selected" : ""}>Forward–Backward</option></select></label><label>Sensitivity<select data-config="sensitivity"><option value="high">High ±15°</option><option value="medium" ${c.sensitivity === "medium" ? "selected" : ""}>Medium ±30°</option><option value="low">Low ±45°</option><option value="custom">Custom</option></select></label>${c.sensitivity === "custom" ? `<label>Max tilt ±<input data-config="customRange" type="number" min="1" value="${c.customRange}">°</label>` : ""}<label>Dead Zone<select data-config="deadZone"><option value="off">OFF</option><option value="1">±1°</option><option value="2" ${c.deadZone === "2" ? "selected" : ""}>±2°</option><option value="3">±3°</option><option value="custom">Custom</option></select></label>${c.deadZone === "custom" ? `<label>Custom dead zone ±<input data-config="customDeadZone" type="number" min="0" value="${c.customDeadZone}">°</label>` : ""}<label>Smoothing<select data-config="smoothing"><option value="off">OFF</option><option value="low" ${c.smoothing === "low" ? "selected" : ""}>Low</option><option value="medium">Medium</option><option value="high">High</option></select></label><label>Reverse<select data-config="reverse"><option value="false" ${!c.reverse ? "selected" : ""}>OFF</option><option value="true" ${c.reverse ? "selected" : ""}>ON</option></select></label>` : `<label>Slider Direction<select data-config="direction"><option value="vertical" ${c.direction === "vertical" ? "selected" : ""}>Vertical</option><option value="horizontal">Horizontal</option></select></label>`}</fieldset>`;
 }
 renderHost = function () {
   baseRenderHost();
 
   const inputPanel = $(".panel.INPUT");
   inputPanel.insertAdjacentHTML("beforeend", `<div class="input-config-grid">${inputConfigMarkup("A")}${inputConfigMarkup("B")}</div>`);
-  $$('[data-player-config]').forEach(fieldset => fieldset.addEventListener("change", event => {
+  $('[data-player-config]').forEach(fieldset => {
+    const c=state.playerInput[fieldset.dataset.playerConfig];
+    fieldset.querySelectorAll('select[data-config]').forEach(select=>{
+      const key=select.dataset.config;
+      select.value=String(c[key]===undefined?(key==='camera'?'rear':'brightness'):c[key]);
+    });
+  });
+  $('[data-player-config]').forEach(fieldset => fieldset.addEventListener("change", event => {
     const key = event.target.dataset.config; if (!key) return;
     const playerId = fieldset.dataset.playerConfig, value = event.target.value;
     state.playerInput[playerId][key] = key === "reverse" ? value === "true" : value;
@@ -107,17 +114,128 @@ renderHost = function () {
     renderHost();
   }));
 };
+
+// Camera processing stays local to the Player; only scalar input values are sent.
+function createCameraPressure(getConfig, publish, getSendHz) {
+  let stream=null, video=null, raf=0, generation=0, latest=null;
+  let light=null, firm=null, permission='unavailable', status='Tap Enable Camera.', frames=0, fps=0, fpsAt=0, frameAt=0, videoTime=-1;
+  const canvas=document.createElement('canvas'); canvas.width=canvas.height=32;
+  const ctx=canvas.getContext('2d', {willReadFrequently:true});
+  const cameraName=()=>getConfig().camera==='front'?'Front':'Rear';
+  const feature=()=>getConfig().opticalFeature||'brightness';
+  const calibrated=()=>light!==null&&firm!==null&&Math.abs(firm-light)>=1;
+  function diagnostics() {
+    const d=$('#cameraDiag'), note=$('#cameraStatus');
+    if(note) note.textContent=status;
+    if(d) d.textContent=[
+      'Camera: '+cameraName(), 'Permission: '+permission, 'Camera FPS: '+fps.toFixed(1),
+      'Mean R: '+(latest?latest.red.toFixed(2):'—'),
+      'Mean G: '+(latest?latest.green.toFixed(2):'—'),
+      'Mean B: '+(latest?latest.blue.toFixed(2):'—'),
+      'Brightness: '+(latest?latest.brightness.toFixed(2):'—'),
+      'Raw optical value ('+feature()+'): '+(latest?latest[feature()].toFixed(2):'—'),
+      'Light: '+light+' / Firm: '+firm,
+      'Normalized pressure: '+($('#current')?$('#current').textContent:'—'),
+      'Send Hz: '+getSendHz().toFixed(1)
+    ].join('\n');
+    ['setLight','setFirm'].forEach(id=>{const b=$('#'+id);if(b)b.disabled=!latest;});
+  }
+  function stop() {
+    generation++; cancelAnimationFrame(raf); raf=0;
+    if(stream)stream.getTracks().forEach(track=>track.stop());
+    if(video){video.pause();video.srcObject=null;video.remove();}
+    stream=video=null;latest=null;light=firm=null;fps=frames=0;videoTime=-1;
+    status='Tap Enable Camera. Then set Light and Firm.'; diagnostics();
+  }
+  function sample(now, token) {
+    if(token!==generation||!stream)return;
+    raf=requestAnimationFrame(t=>sample(t,token));
+    if(!video||video.readyState<2||!video.videoWidth||now-frameAt<34||video.currentTime===videoTime)return;
+    frameAt=now;videoTime=video.currentTime;
+    try {
+      const w=video.videoWidth,h=video.videoHeight,side=Math.min(w,h)*.4;
+      ctx.drawImage(video,(w-side)/2,(h-side)/2,side,side,0,0,32,32);
+      const pixels=ctx.getImageData(0,0,32,32).data;
+      let red=0,green=0,blue=0;
+      for(let i=0;i<pixels.length;i+=4){red+=pixels[i];green+=pixels[i+1];blue+=pixels[i+2];}
+      const count=pixels.length/4; red/=count;green/=count;blue/=count;
+      latest={red,green,blue,brightness:.2126*red+.7152*green+.0722*blue};
+      frames++; if(now-fpsAt>=1000){fps=frames*1000/(now-fpsAt);frames=0;fpsAt=now;}
+      if(calibrated())publish(clamp((latest[feature()]-light)/(firm-light)*100),latest[feature()]);
+      diagnostics();
+    } catch(error) {stop();status='Camera processing error: '+error.name;diagnostics();}
+  }
+  async function enable() {
+    stop(); const token=generation;
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status='Camera unavailable. Use Slider.';diagnostics();return;}
+    permission='requesting';status='Waiting for camera permission…';diagnostics();
+    try {
+      const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{
+        facingMode:{exact:getConfig().camera==='front'?'user':'environment'},
+        width:{ideal:320},height:{ideal:240},frameRate:{ideal:30,max:30}
+      }});
+      if(token!==generation){next.getTracks().forEach(t=>t.stop());return;}
+      stream=next;permission='granted';
+      video=document.createElement('video');video.muted=true;video.playsInline=true;
+      video.setAttribute('playsinline','');video.setAttribute('aria-hidden','true');
+      video.style.cssText='position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;bottom:0;left:0';
+      document.body.appendChild(video);video.srcObject=stream;
+      stream.getVideoTracks()[0].onended=()=>{if(token===generation){stop();status='Camera stopped. Tap Enable Camera.';diagnostics();}};
+      await video.play();if(token!==generation)return;
+      status='Lightly cover the camera, then Set Light. Press gently firmer, then Set Firm.';
+      fpsAt=performance.now();frameAt=0;raf=requestAnimationFrame(t=>sample(t,token));diagnostics();
+    } catch(error) {
+      if(token!==generation)return;
+      stop();permission=error.name==='NotAllowedError'?'denied':'unavailable';
+      status='Camera error: '+error.name+'. Check permission/camera selection or use Slider.';diagnostics();
+    }
+  }
+  function calibrate(which) {
+    if(!latest)return;
+    if(which==='light')light=latest[feature()];else firm=latest[feature()];
+    status=calibrated()?'Calibrated. Pressure-like input; not force in N.':
+      light!==null&&firm!==null?'Light / Firm optical difference is too small. Recalibrate or use Slider.':'Set the other calibration point.';
+    diagnostics();
+  }
+  function mount() {
+    $('#enableCamera').onclick=enable;
+    $('#setLight').onclick=()=>calibrate('light');
+    $('#setFirm').onclick=()=>calibrate('firm');
+    diagnostics();
+  }
+  return {stop,mount};
+}
+function bindVerticalSlider(slider, publish) {
+  let pointer=null;
+  const set=v=>{v=clamp(v);slider.setAttribute('aria-valuenow',v.toFixed(1));
+    slider.querySelector('i').style.bottom=v+'%';publish(v,v);};
+  const position=e=>{const r=slider.getBoundingClientRect();set((r.bottom-e.clientY)/r.height*100);};
+  slider.onpointerdown=e=>{if(pointer!==null||e.isPrimary===false)return;pointer=e.pointerId;slider.setPointerCapture(pointer);e.preventDefault();position(e);};
+  slider.onpointermove=e=>{if(e.pointerId===pointer){e.preventDefault();position(e);}};
+  slider.onpointerup=e=>{if(e.pointerId===pointer){position(e);pointer=null;}};
+  slider.onpointercancel=slider.onlostpointercapture=()=>{pointer=null;};
+  slider.onkeydown=e=>{let v=Number(slider.getAttribute('aria-valuenow'));
+    if(e.key==='ArrowUp'||e.key==='ArrowRight')v+=1;
+    else if(e.key==='ArrowDown'||e.key==='ArrowLeft')v-=1;
+    else if(e.key==='Home')v=0;else if(e.key==='End')v=100;else return;
+    e.preventDefault();set(v);
+  };
+}
+
 function enhancedPlayerSafe(role, room) {
   const root=$('#app');
-  let config={inputMethod:'slider',direction:'vertical',sensitivity:'medium',customRange:30,deadZone:'2',customDeadZone:2,smoothing:'low',reverse:false},value=50,raw=0,neutral=0,ema=50,permission='unavailable',sensorAt=0,sendAt=0,sequence=0,pending=false;
-  let bus;
+  let config={inputMethod:'slider',direction:'vertical',sensitivity:'medium',customRange:30,deadZone:'2',customDeadZone:2,smoothing:'low',reverse:false,camera:'rear',opticalFeature:'brightness'},value=50,raw=0,neutral=0,ema=50,permission='unavailable',sensorAt=0,sendAt=0,sequence=0,pending=false;
+  let bus, sentCount=0, sendWindow=performance.now(), sendHz=0;
   const range=()=>config.sensitivity==='high'?15:config.sensitivity==='low'?45:config.sensitivity==='custom'?+config.customRange||30:30, dead=()=>config.deadZone==='off'?0:config.deadZone==='custom'?+config.customDeadZone||0:+config.deadZone, alpha=()=>{const a={off:1,low:.5,medium:.3,high:.15}[config.smoothing];return a===undefined?.5:a};
-  const send=()=>{pending=false;sendAt=performance.now();if(bus)bus.send({type:'input',playerId:role,inputType:config.inputMethod,rawValue:raw,normalizedValue:value,clientTimestamp:Date.now(),sequenceNumber:++sequence})};
+  const send=()=>{pending=false;sendAt=performance.now();if(bus&&bus.connection&&bus.connection.open){sentCount++;if(sendAt-sendWindow>=1000){sendHz=sentCount*1000/(sendAt-sendWindow);sentCount=0;sendWindow=sendAt;}}if(bus)bus.send({type:'input',playerId:role,inputType:config.inputMethod,rawValue:raw,normalizedValue:value,clientTimestamp:Date.now(),sequenceNumber:++sequence})};
   const publish=(n,r)=>{raw=r;ema=ema+(clamp(n)-ema)*alpha();value=ema;if($('#current'))$('#current').textContent=value.toFixed(1);if(!pending){pending=true;setTimeout(send,34)}};
   const mapTilt=angle=>{let d=angle-neutral, z=dead(), R=range(), n;if(Math.abs(d)<=z)n=50;else if(d>0)n=50+(d-z)/(R-z)*50;else n=50+(d+z)/(R-z)*50;n=clamp(n);return config.reverse?100-n:n};
-  const render=()=>{let tilt=config.inputMethod==='tilt', direction=config.direction==='forward-backward'?'FORWARD/BACKWARD':'LEFT/RIGHT';root.id='player';root.innerHTML=`<main class="player-shell"><div class="eyebrow">UCM CO-OP LAB</div><h1>PLAYER ${role}</h1>${tilt?`<h2>TILT · ${direction}</h2><button id="enable" class="primary">Enable Tilt Sensor</button><button id="neutral">Set Neutral</button><p>Sensitivity: ${config.sensitivity} ±${range()}°<br>Dead Zone: ±${dead()}°<br>Smoothing: ${config.smoothing}</p>`:`<input id="slider" class="player-slider" type="range" min="0" max="100" step=".1" value="${value}">`}<output id="current" class="player-value">${value.toFixed(1)}</output><p>TOTAL <b id="sum">—</b> / TARGET <b id="target">—</b></p><details><summary>Diagnostics</summary><p id="diag">Permission: ${permission}<br>Raw beta: —<br>Raw gamma: —<br>Neutral: ${neutral}<br>Sensor Hz: 0<br>Send Hz: 0</p></details></main>`;if(tilt){$('#enable').onclick=enable;$('#neutral').onclick=()=>{neutral=raw;ema=value=50;$('#current').textContent='50.0'}}else $('#slider').oninput=e=>publish(+e.target.value,+e.target.value)};
-  async function enable(){try{if(DeviceOrientationEvent.requestPermission)permission=await DeviceOrientationEvent.requestPermission();else permission='granted';if(permission!=='granted')return render();addEventListener('deviceorientation',e=>{let angle=config.direction==='forward-backward'?e.beta:e.gamma;if(angle==null)return;let now=performance.now(),hz=sensorAt?1000/(now-sensorAt):0;sensorAt=now;publish(mapTilt(angle),angle);$('#diag')&&($('#diag').innerHTML=`Permission: ${permission}<br>Raw beta: ${e.beta?.toFixed(2)}<br>Raw gamma: ${e.gamma?.toFixed(2)}<br>Raw angle: ${angle.toFixed(2)}<br>Neutral: ${neutral.toFixed(2)}<br>Sensor Hz: ${hz.toFixed(1)}<br>Send Hz: ${sendAt?(1000/(now-sendAt)).toFixed(1):0}`)},{passive:true});render()}catch(_){permission='denied';render()}}
+  const camera=createCameraPressure(()=>config,publish,()=>sendHz);
+  const render=()=>{let cameraMode=config.inputMethod==='camera-pressure', vertical=config.direction!=='horizontal', tilt=config.inputMethod==='tilt', direction=config.direction==='forward-backward'?'FORWARD/BACKWARD':'LEFT/RIGHT';root.id='player';root.innerHTML=`<main class="player-shell"><div class="eyebrow">UCM CO-OP LAB</div><h1>PLAYER ${role}</h1>${cameraMode?`<h2>CAMERA PRESSURE · ${config.camera==='front'?'FRONT':'REAR'}</h2><button id="enableCamera" class="primary">Enable Camera</button><p>Lightly cover the camera with your fingertip.</p><p>Pressure-like input, not a force sensor. Press gently; do not push hard.</p><button id="setLight">Set Light</button> <button id="setFirm">Set Firm</button><p id="cameraStatus" role="status"></p><span>Pressure: </span>`:tilt?`<h2>TILT · ${direction}</h2><button id="enable" class="primary">Enable Tilt Sensor</button><button id="neutral">Set Neutral</button><p>Sensitivity: ${config.sensitivity} ±${range()}°<br>Dead Zone: ±${dead()}°<br>Smoothing: ${config.smoothing}</p>`:`<h2>SLIDER · ${vertical?'VERTICAL':'HORIZONTAL'}</h2>${vertical?`<div style="text-align:center">100</div><div id="verticalSlider" role="slider" tabindex="0" aria-label="Player ${role} vertical input" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${value}" style="position:relative;height:45vh;min-height:240px;width:100%;touch-action:none;user-select:none;background:#12213a;border:1px solid #52739e;border-radius:18px"><div style="position:absolute;left:50%;top:0;bottom:0;width:8px;background:#52739e"></div><i style="position:absolute;left:15%;right:15%;height:18px;background:#5eead4;border-radius:9px;bottom:${value}%;transform:translateY(50%);pointer-events:none"></i></div><div style="text-align:center">0</div>`:`<input id="slider" class="player-slider" style="width:100%;height:64px;direction:ltr" type="range" min="0" max="100" step=".1" value="${value}"><div style="display:flex;justify-content:space-between"><span>0</span><span>100</span></div>`}<span>Current: </span>`}<output id="current" class="player-value">${value.toFixed(1)}</output><p>TOTAL <b id="sum">—</b> / TARGET <b id="target">—</b></p><details><summary>Diagnostics</summary><pre id="cameraDiag" style="white-space:pre-wrap"></pre><p id="diag">Permission: ${permission}<br>Raw beta: —<br>Raw gamma: —<br>Neutral: ${neutral}<br>Sensor Hz: 0<br>Send Hz: 0</p></details></main>`;$('#cameraDiag').hidden=!cameraMode;$('#diag').hidden=cameraMode;if(cameraMode){camera.mount();}else if(tilt){$('#enable').onclick=enable;$('#neutral').onclick=()=>{neutral=raw;ema=value=50;$('#current').textContent='50.0'}}else if(vertical){bindVerticalSlider($('#verticalSlider'),publish);}else $('#slider').oninput=e=>publish(+e.target.value,+e.target.value)};
+  async function enable(){try{if(DeviceOrientationEvent.requestPermission)permission=await DeviceOrientationEvent.requestPermission();else permission='granted';if(permission!=='granted')return render();addEventListener('deviceorientation',e=>{if(config.inputMethod!=='tilt')return;let angle=config.direction==='forward-backward'?e.beta:e.gamma;if(angle==null)return;let now=performance.now(),hz=sensorAt?1000/(now-sensorAt):0;sensorAt=now;publish(mapTilt(angle),angle);$('#diag')&&($('#diag').innerHTML=`Permission: ${permission}<br>Raw beta: ${e.beta?.toFixed(2)}<br>Raw gamma: ${e.gamma?.toFixed(2)}<br>Raw angle: ${angle.toFixed(2)}<br>Neutral: ${neutral.toFixed(2)}<br>Sensor Hz: ${hz.toFixed(1)}<br>Send Hz: ${sendAt?(1000/(now-sendAt)).toFixed(1):0}`)},{passive:true});render()}catch(_){permission='denied';render()}}
+  addEventListener('pagehide',()=>camera.stop());
+  addEventListener('beforeunload',()=>camera.stop());
   render();
-  try{bus=new PeerBus(room,role);bus.onInputConfig=(next,id)=>{if(id&&id!==role)return;config={...config,...next};render()};bus.onFeedback=p=>{$('#sum')&&($('#sum').textContent=p.taskValue?.toFixed(1));$('#target')&&($('#target').textContent=p.target?.toFixed(1))};bus.onConnected=()=>publish(value,raw)}catch(_){/* Player UI remains available when PeerJS initialization fails. */}
+  try{bus=new PeerBus(room,role);bus.onInputConfig=(next,id)=>{if(id&&id!==role)return;const previous=config;config={...config,...next};if(previous.inputMethod!==config.inputMethod||previous.camera!==config.camera||previous.opticalFeature!==config.opticalFeature){camera.stop();if(config.inputMethod==='camera-pressure'){value=ema=raw=0;}}render()};bus.onFeedback=p=>{$('#sum')&&($('#sum').textContent=p.taskValue?.toFixed(1));$('#target')&&($('#target').textContent=p.target?.toFixed(1))};bus.onConnected=()=>publish(value,raw)}catch(_){/* Player UI remains available when PeerJS initialization fails. */}
 }
 let p=new URLSearchParams(location.search),playerId=p.get('player');playerId&&p.get('room')&&['A','B'].includes(playerId)?enhancedPlayerSafe(playerId,p.get('room')):renderHost();
